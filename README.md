@@ -1,11 +1,24 @@
 <div align="center">
 
-<h1><img src="docs/media/logo.png" width="46" height="46" alt="Zero-HLM logo" align="absmiddle"> Zero-HLM-Bench</h1>
+<h1><img src="docs/media/logo.png" width="46" height="46" alt="Zero-HLM logo" align="absmiddle"> Zero-HLM</h1>
 
-**A Simulation Benchmark for Humanoid Loco-Manipulation**
+**Generalizable Humanoid Loco-Manipulation without Real Robot Data**
 
 [![arXiv](https://img.shields.io/badge/arXiv-2610.35075-b83b42.svg)](https://arxiv.org/abs/2610.35075)
 [![Project Page](https://img.shields.io/badge/Project-Page-3c718f.svg)](https://young-bit.github.io/zero-hlm/)
+
+</div>
+
+> 📦 **Available now:** Zero-HLM-Bench — benchmark evaluation code, simulation training datasets, and GR00T checkpoints.
+>
+> 🚀 **Full pipeline release:** The complete data-generation code, including motion synthesis, rollout validation, execution-conditioned correction, and LeRobot export, is ready. We are conducting an internal code review while the paper is under submission. We plan to release it **over the next few months**, together with the **source demonstrations, annotations, and configurations** needed to reproduce the pipeline. **Stay tuned! 🔔**
+
+<div align="center">
+
+<h2><img src="docs/media/benchmark-logo.png" width="38" height="38" alt="Zero-HLM-Bench logo" align="absmiddle"> Zero-HLM-Bench</h2>
+
+**A Simulation Benchmark for Humanoid Loco-Manipulation**
+
 [![Documentation](https://img.shields.io/badge/Documentation-526e9b.svg)](docs/installation.md)
 [![Hugging Face Models](https://img.shields.io/badge/Hugging%20Face-Models-668cba.svg)](https://huggingface.co/YDY0427/Zero-HLM-Bench-GR00T)
 [![Hugging Face Data](https://img.shields.io/badge/Hugging%20Face-Data-c99a50.svg)](https://huggingface.co/datasets/YDY0427/Zero-HLM-Bench)
@@ -57,8 +70,8 @@ Each task has a fixed 100-configuration manifest. The client verifies its integr
 Clone the repository with [Git LFS](https://git-lfs.com/) installed to retrieve the scene assets:
 
 ```bash
-git clone https://github.com/BIGAI-General-Vision-Lab/Zero-HLM-Bench.git
-cd Zero-HLM-Bench
+git clone https://github.com/BIGAI-General-Vision-Lab/Zero-HLM.git
+cd Zero-HLM
 git lfs pull
 ```
 
