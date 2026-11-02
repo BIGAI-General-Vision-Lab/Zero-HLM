@@ -17,7 +17,7 @@
 
 <h2><img src="docs/media/benchmark-logo.png" width="38" height="38" alt="Zero-HLM-Bench logo" align="absmiddle"> Zero-HLM-Bench</h2>
 
-**A Simulation Benchmark for Humanoid Loco-Manipulation**
+**A Simulation Benchmark for Humanoid VLA Policies with Gaussian Rendering and Whole-Body Control**
 
 [![Documentation](https://img.shields.io/badge/Documentation-526e9b.svg)](docs/installation.md)
 [![Hugging Face Models](https://img.shields.io/badge/Hugging%20Face-Models-668cba.svg)](https://huggingface.co/YDY0427/Zero-HLM-Bench-GR00T)
