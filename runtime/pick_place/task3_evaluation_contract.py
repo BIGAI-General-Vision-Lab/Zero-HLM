@@ -65,6 +65,7 @@ def evaluate_task3_carry_basket_success(payload: dict[str, np.ndarray], cfg: dic
         "placement_root_pose",
         "door_joint_position",
         "door_contact_latched",
+        "robot_hand_open",
     )
     missing = [name for name in required if name not in payload or len(payload[name]) == 0]
     if missing:
@@ -75,18 +76,20 @@ def evaluate_task3_carry_basket_success(payload: dict[str, np.ndarray], cfg: dic
     stool_pose = np.asarray(payload["placement_root_pose"], dtype=np.float64)
     hinge = np.asarray(payload["door_joint_position"], dtype=np.float64).reshape(-1)
     latched = np.asarray(payload["door_contact_latched"], dtype=bool).reshape(-1)
-    frame_count = min(len(basket_pose), len(basket_velocity), len(stool_pose), len(hinge), len(latched))
+    hand_open = np.asarray(payload["robot_hand_open"], dtype=np.float64)
+    frame_count = min(len(basket_pose), len(basket_velocity), len(stool_pose), len(hinge), len(latched), len(hand_open))
     requested_stable_frames = int(cfg.get("stable_frames", 10))
     stable_frames = min(requested_stable_frames, frame_count)
     tail = slice(frame_count - stable_frames, frame_count)
 
-    stool_rotation = _quat_wxyz_to_matrix(stool_pose[frame_count - 1, 3:7])
-    basket_local = stool_rotation.T @ (
-        basket_pose[frame_count - 1, :3] - stool_pose[frame_count - 1, :3]
+    stool_rotation = _quat_wxyz_to_matrix(stool_pose[tail, 3:7])
+    basket_local_window = np.einsum(
+        "nji,nj->ni", stool_rotation, basket_pose[tail, :3] - stool_pose[tail, :3]
     )
+    basket_local = basket_local_window[-1]
     half_xy = np.asarray(cfg["stool_seat_half_xy_m"], dtype=np.float64)
-    inside = bool(np.all(np.abs(basket_local[:2]) <= half_xy))
-    basket_rotation = _quat_wxyz_to_matrix(basket_pose[frame_count - 1, 3:7])
+    inside = bool(np.all(np.abs(basket_local_window[:, :2]) <= half_xy))
+    basket_rotation = _quat_wxyz_to_matrix(basket_pose[tail, 3:7])
     local_min = np.asarray(cfg["basket_local_min_m"], dtype=np.float64)
     local_max = np.asarray(cfg["basket_local_max_m"], dtype=np.float64)
     corners = np.asarray(
@@ -95,15 +98,14 @@ def evaluate_task3_carry_basket_success(payload: dict[str, np.ndarray], cfg: dic
          for z in (local_min[2], local_max[2])],
         dtype=np.float64,
     )
-    basket_bottom = float(
-        basket_pose[frame_count - 1, 2] + np.min((basket_rotation @ corners.T).T[:, 2])
+    basket_bottom = basket_pose[tail, 2] + np.min(
+        np.einsum("nij,kj->nki", basket_rotation, corners)[:, :, 2], axis=1
     )
-    seat_z = float(stool_pose[frame_count - 1, 2] + float(cfg["stool_seat_z_m"]))
-    visual_bottom_supported = abs(basket_bottom - seat_z) <= float(cfg["seat_height_tolerance_m"])
-    collision_hull_supported = bool(
-        seat_z + 0.02 <= basket_pose[frame_count - 1, 2] <= seat_z + 0.35
-    )
-    supported = bool(visual_bottom_supported or collision_hull_supported)
+    seat_z = stool_pose[tail, 2] + float(cfg["stool_seat_z_m"])
+    bottom_delta = basket_bottom - seat_z
+    # A height band around the basket root cannot establish support by the seat.
+    supported = bool(np.all(np.abs(bottom_delta) <= float(cfg["seat_height_tolerance_m"])))
+    hands_released = bool(np.all(hand_open[tail] >= float(cfg["minimum_hand_open"])))
     linear_speed = np.linalg.norm(basket_velocity[tail, :3], axis=1)
     angular_speed = np.linalg.norm(basket_velocity[tail, 3:6], axis=1)
     z_range = float(np.ptp(basket_pose[tail, 2])) if stable_frames else math.inf
@@ -116,8 +118,9 @@ def evaluate_task3_carry_basket_success(payload: dict[str, np.ndarray], cfg: dic
     checks = {
         "basket_center_inside_stool_seat": inside,
         "basket_supported_by_stool": supported,
-        "linear_speed_settled": bool(linear_speed[-1] <= float(cfg["maximum_linear_speed_mps"])),
-        "angular_speed_settled": bool(angular_speed[-1] <= float(cfg["maximum_angular_speed_radps"])),
+        "hands_released": hands_released,
+        "linear_speed_settled": bool(np.all(linear_speed <= float(cfg["maximum_linear_speed_mps"]))),
+        "angular_speed_settled": bool(np.all(angular_speed <= float(cfg["maximum_angular_speed_radps"]))),
         "height_settled": z_range <= float(cfg["maximum_tail_z_range_m"]),
         "stable_window_complete": frame_count >= requested_stable_frames,
         "door_triggered": triggered,
@@ -129,9 +132,10 @@ def evaluate_task3_carry_basket_success(payload: dict[str, np.ndarray], cfg: dic
         "evaluated_frame": int(frame_count - 1),
         "stable_frames": int(stable_frames),
         "basket_local_xy_m": basket_local[:2].astype(float).tolist(),
-        "basket_bottom_minus_seat_m": float(basket_bottom - seat_z),
-        "basket_visual_bottom_supported": bool(visual_bottom_supported),
-        "basket_collision_hull_supported": bool(collision_hull_supported),
+        "basket_bottom_minus_seat_m": float(bottom_delta[-1]),
+        "basket_visual_bottom_supported": supported,
+        "robot_hand_open": hand_open[frame_count - 1].astype(float).tolist(),
+        "criterion_version": "released-settled-v2",
         "basket_final_linear_speed_mps": float(linear_speed[-1]),
         "basket_final_angular_speed_radps": float(angular_speed[-1]),
         "basket_tail_z_range_m": z_range,
@@ -152,6 +156,7 @@ TASK3_CARRY_BASKET_REPLAY_SUCCESS_CFG = {
     "basket_local_max_m": (0.15721323, 0.17953092, 0.11761208),
     "stool_seat_z_m": 0.435,
     "seat_height_tolerance_m": 0.04,
+    "minimum_hand_open": 0.8,
     "maximum_linear_speed_mps": 0.05,
     "maximum_angular_speed_radps": 0.50,
     "maximum_tail_z_range_m": 0.01,

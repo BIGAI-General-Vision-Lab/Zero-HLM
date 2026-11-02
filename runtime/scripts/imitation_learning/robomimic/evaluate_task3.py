@@ -491,7 +491,17 @@ def update_success_state(runtime: dict[str, Any], slot: shared.EnvSlot) -> dict[
     latched = getattr(env, "_task3_door_contact_latched", None)
     door_history["contact_latched"].append(bool(latched[slot.env_id].item()) if latched is not None else False)
 
-    payload: dict[str, np.ndarray] = {}
+    hand_state = shared.build_gr00t_state_values_env(
+        env.scene["robot"], int(slot.env_id), runtime["sim_joint_names"], runtime["joint_limits"]
+    )
+    hand_history = slot.success_state_history.setdefault("__hands__", {"open": []})
+    hand_history["open"].append(np.asarray([
+        hand_state["left_hand_gripper"][0], hand_state["right_hand_gripper"][0]
+    ], dtype=np.float64))
+
+    payload: dict[str, np.ndarray] = {
+        "robot_hand_open": np.stack(hand_history["open"], axis=0)
+    }
     for asset_name in runtime["success_state_assets"]:
         streams = slot.success_state_history[asset_name]
         payload[f"{asset_name}_root_pose"] = np.stack(streams["root_pose"], axis=0)

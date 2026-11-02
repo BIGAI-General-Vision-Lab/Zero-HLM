@@ -21,7 +21,7 @@ def _payload(*, basket_x: float = 0.0, latched: bool = True, moving: bool = Fals
     stool = np.tile(np.asarray([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]), (frames, 1))
     # Basket bottom equals the 0.435 m stool seat.
     basket = np.tile(
-        np.asarray([basket_x, 0.0, 0.435 + 0.05880604, 1.0, 0.0, 0.0, 0.0]),
+        np.asarray([basket_x, 0.0, 0.435, 1.0, 0.0, 0.0, 0.0]),
         (frames, 1),
     )
     velocity = np.zeros((frames, 6), dtype=np.float64)
@@ -29,6 +29,7 @@ def _payload(*, basket_x: float = 0.0, latched: bool = True, moving: bool = Fals
         velocity[:, 0] = 0.2
     return {
         "object_root_pose": basket,
+        "robot_hand_open": np.ones((frames, 2), dtype=np.float64),
         "object_root_velocity": velocity,
         "placement_root_pose": stool,
         "door_joint_position": np.linspace(0.0, math.radians(62.0), frames),
@@ -85,3 +86,55 @@ def test_task3_reports_maximum_basket_lift() -> None:
         payload, TASK3_CARRY_BASKET_REPLAY_SUCCESS_CFG
     )
     assert math.isclose(result["max_object_lift"], 0.21, abs_tol=1.0e-9)
+
+
+def test_task3_rejects_stationary_basket_above_seat() -> None:
+    payload = _payload()
+    payload["object_root_pose"][:, 2] += 0.1675468863
+    result = evaluate_task3_carry_basket_success(payload, TASK3_CARRY_BASKET_REPLAY_SUCCESS_CFG)
+    assert not result["ok"]
+    assert "basket_supported_by_stool" in result["reasons"]
+
+
+def test_task3_requires_both_hands_open() -> None:
+    for hand in (0, 1):
+        payload = _payload()
+        payload["robot_hand_open"][:, hand] = 0.0
+        result = evaluate_task3_carry_basket_success(payload, TASK3_CARRY_BASKET_REPLAY_SUCCESS_CFG)
+        assert not result["ok"]
+        assert "hands_released" in result["reasons"]
+
+
+def test_task3_rejects_missing_hand_measurements() -> None:
+    payload = _payload()
+    del payload["robot_hand_open"]
+    result = evaluate_task3_carry_basket_success(payload, TASK3_CARRY_BASKET_REPLAY_SUCCESS_CFG)
+    assert not result["ok"]
+    assert "robot_hand_open" in result["missing"]
+
+
+def test_task3_requires_stability_throughout_window() -> None:
+    for component, speed in ((0, 0.2), (3, 1.0)):
+        payload = _payload()
+        payload["object_root_velocity"][-2, component] = speed
+        result = evaluate_task3_carry_basket_success(payload, TASK3_CARRY_BASKET_REPLAY_SUCCESS_CFG)
+        assert not result["ok"]
+
+
+def test_task3_rejects_release_only_on_last_frame() -> None:
+    payload = _payload()
+    payload["robot_hand_open"][:-1, :] = 0.0
+    assert not evaluate_task3_carry_basket_success(payload, TASK3_CARRY_BASKET_REPLAY_SUCCESS_CFG)["ok"]
+
+
+def test_task3_requires_entire_window_over_seat() -> None:
+    payload = _payload()
+    payload["object_root_pose"][0, 0] = 0.4
+    assert not evaluate_task3_carry_basket_success(payload, TASK3_CARRY_BASKET_REPLAY_SUCCESS_CFG)["ok"]
+
+
+def test_task3_requires_full_stability_window() -> None:
+    payload = {key: value[:9] for key, value in _payload().items()}
+    result = evaluate_task3_carry_basket_success(payload, TASK3_CARRY_BASKET_REPLAY_SUCCESS_CFG)
+    assert not result["ok"]
+    assert "stable_window_complete" in result["reasons"]

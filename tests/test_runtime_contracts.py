@@ -199,3 +199,56 @@ def test_append_video_columns_preserves_previous_results(tmp_path):
         append(path, [{'scenario_id': 'next', 'third_person_video_path': 'third.mp4'}])
     assert path.read_bytes() == corrupt
     assert before != corrupt
+
+
+def test_task3_success_payload_uses_measured_hand_state():
+    import numpy as np
+    from types import SimpleNamespace
+
+    class Tensor:
+        def __init__(self, value):
+            self.value = np.asarray(value)
+
+        def __getitem__(self, index):
+            return Tensor(self.value[index])
+
+        def detach(self):
+            return self
+
+        def cpu(self):
+            return self
+
+        def numpy(self):
+            return self.value
+
+        def item(self):
+            return self.value.item()
+
+    state = Tensor([[0, 0, 0.435, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
+    asset = SimpleNamespace(data=SimpleNamespace(root_state_w=state))
+    door = SimpleNamespace(
+        find_joints=lambda _: ([0], []),
+        data=SimpleNamespace(joint_pos=Tensor([[1.0]]), joint_vel=Tensor([[0.0]])),
+    )
+    env = SimpleNamespace(scene={"object": asset, "placement": asset, "scene": door, "robot": object()},
+                          _task3_door_contact_latched=Tensor([True]))
+    captured = []
+
+    def evaluate(payload, cfg):
+        captured.append(payload)
+        return {"ok": False}
+
+    shared = SimpleNamespace(EnvSlot=object, build_gr00t_state_values_env=lambda *args: {
+        "left_hand_gripper": [0.4], "right_hand_gripper": [1.0],
+    })
+    update = load_runtime_function("evaluate_task3.py", "update_success_state",
+                                   {"np": np, "Any": object, "shared": shared})
+    runtime = {"env": env, "success_state_assets": ("object", "placement"),
+               "sim_joint_names": [], "joint_limits": {},
+               "replay_success_evaluator": evaluate, "replay_success_cfg": {}}
+    slot = SimpleNamespace(env_id=0, success_state_history={},
+                           left_hand_state_open01=1.0, right_hand_state_open01=1.0)
+    update(runtime, slot)
+    update(runtime, slot)
+    np.testing.assert_allclose(captured[-1]["robot_hand_open"], [[0.4, 1.0], [0.4, 1.0]])
+    assert len(captured[-1]["robot_hand_open"]) == len(captured[-1]["object_root_pose"])
