@@ -11,7 +11,7 @@
 
 > 📦 **Available now:** Zero-HLM-Bench — benchmark evaluation code, simulation training datasets, and GR00T checkpoints.
 >
-> 🚀 **Full pipeline release:** The complete data-generation code, including motion synthesis, rollout validation, execution-conditioned correction, and LeRobot export, is ready. We are conducting an internal code review while the paper is under submission. We plan to release it **over the next few months**, together with the **source demonstrations, annotations, and configurations** needed to reproduce the pipeline. **Stay tuned! 🔔**
+> 🚀 **Coming next:** We plan to release the **full data-generation pipeline and real-world deployment code**, along with source demonstrations, annotations, and configurations, **over the next few months**. Stay tuned! 🔔
 
 <div align="center">
 
